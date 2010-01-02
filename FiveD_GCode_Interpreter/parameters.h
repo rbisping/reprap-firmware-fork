@@ -23,7 +23,8 @@
 //NOW WE DEFINE WHICH "FEATURES" each motherboard type has:
 
 // utilise the extra hardware interrupts on the MEGA for Opto end-stops, and Encoder WHeel/s, and define the basic hardware profile you have
-#ifdef MOTHERBOARD == 3  //MEGA
+#if MOTHERBOARD == 3
+#define MEGA 1
 #define INTERRUPT_ENDSTOPS 1
 #define INTERRUPT_ENCODERS 1
 #define EXTRUDER_TYPE_0  ENCODER_MANAGED_DC  // change to STEP_DIR for the other type of extruder
@@ -34,7 +35,8 @@
 #endif
 
 // utilise the extra hardware on the SANGUINO for enabling/disabling the stepper drivers as required ( to save power, etc ) , and define extruder type/s you have 
-#ifdef MOTHERBOARD == 1 // SANGUINO
+#if MOTHERBOARD == 1
+#define SANGUINO 1
 #define USE_STEPPER_ENABLE 1
 #define EXTRUDER_TYPE_0  STEP_DIR  // change to ENCODER_MANAGED_DC for the other type of extruder
 //#define EXTRUDER_TYPE_1  STEP_DIR  // uncomment if two extruders are in use
@@ -43,8 +45,9 @@
 
 #endif 
 
-// utilise the extra hardware on the SANGUINO for enabling/disabling the stepper drivers as required ( to save power, etc ) , and define extruder type/s you have 
-#ifdef MOTHERBOARD == 2 // RepRap Motherboard with RS485
+// utilise the extra hardware on the "RepRap Motherboard with RS485" for enabling/disabling the stepper drivers as required ( to save power, etc ) , and define extruder type/s you have 
+#if MOTHERBOARD == 2 
+#define RM485 1
 #define USE_STEPPER_ENABLE 1
 #define EXTRUDER_TYPE_0  STEP_DIR  // change to ENCODER_MANAGED_DC for the other type of extruder
 //#define EXTRUDER_TYPE_1  STEP_DIR  // uncomment if two extruders are in use
@@ -105,6 +108,11 @@
 #define E_STEPS_PER_INCH (E_STEPS_PER_MM*INCHES_TO_MM)
 #define E_MOTOR_STEPS    400
 
+// TODO implement these variables: For when we have a DC Driven Extruder:
+// either:
+#define E_MILLIS_PER_MM 300 // the number of miliseconds to produce 1mm of output when at full speed ( open loop extruder)
+// or:
+#define E_INTERRUPTS_PER_STEP 800 // depends on the number of slots in your encoder and the number of revolutions of the encoder it takes to make a MM of output. ( assuming E_STEPS_PER_WWMM = 1 ) 
 //our maximum feedrates
 #define FAST_XY_FEEDRATE 2000.0
 #define FAST_Z_FEEDRATE  5.0
