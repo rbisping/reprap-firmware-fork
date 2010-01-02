@@ -107,6 +107,10 @@ ISR(TIMER1_COMPA_vect)
 
 void setup()
 {
+  
+    Serial.begin(19200);
+  Serial.println("setup");
+  
   disableTimerInterrupt();
   setupTimerInterrupt();
   debugstring[0] = 0;
@@ -124,7 +128,11 @@ void setup()
   cdda[1] = &cdda1;  
   cdda[2] = &cdda2;  
   cdda[3] = &cdda3;
-  
+
+  //init any optional elements
+  init_encoders();
+  init_optos();
+
   //setExtruder();
   
   init_process_string();
@@ -135,7 +143,7 @@ void setup()
   where_i_am.e = 0.0;
   where_i_am.f = SLOW_XY_FEEDRATE;
   
-  Serial.begin(19200);
+ // Serial.begin(19200);
   Serial.println("start");
   
   setTimer(DEFAULT_TICK);

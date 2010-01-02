@@ -410,18 +410,18 @@ bool process_string(char instruction[], int size)
 			//turn extruder on, forward
 			case 101:
 				ex[extruder_in_use]->set_direction(1);
-				ex[extruder_in_use]->set_speed(extruder_speed);
+				//ex[extruder_in_use]->set_speed(extruder_speed);
 				break;
 
 			//turn extruder on, reverse
 			case 102:
 				ex[extruder_in_use]->set_direction(0);
-				ex[extruder_in_use]->set_speed(extruder_speed);
+				//ex[extruder_in_use]->set_speed(extruder_speed);
 				break;
 
 			//turn extruder off
 			case 103:
-				ex[extruder_in_use]->set_speed(0);
+				//ex[extruder_in_use]->set_speed(0);
 				break;
 #endif
 			//custom code for temperature control
