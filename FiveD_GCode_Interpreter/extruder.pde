@@ -80,12 +80,14 @@ extruder::extruder(byte md_pin, byte ms_pin, byte h_pin, byte f_pin, byte t_pin,
 
         //these our the default values for the extruder.
         e_speed = 0;
-        target_celsius = 0;
+        //target_celsius = 17;
+        target_celsius = 240;  //default to HOT!
         max_celsius = 0;
         heater_low = 64;
         heater_high = 255;
         heater_current = 0;
         valve_open = false;
+        can_step = true; 
         
 //this is for doing encoder based extruder control
 //        rpm = 0;
@@ -95,7 +97,9 @@ extruder::extruder(byte md_pin, byte ms_pin, byte h_pin, byte f_pin, byte t_pin,
 //        error_delta = 0;
         e_direction = EXTRUDER_FORWARD;
         
-        //default to cool
+        encoder_target = 0; // for DVC driven extruder/s        
+        
+        //set default temp
         set_target_temperature(target_celsius);
 }
 
@@ -260,6 +264,73 @@ void extruder::manage()
 }
 
 
+void extruder::step(bool actual)
+{
+// 'actual' determines if we are doing a extruder step requireing new movement, or a calculation requiring no further movement
+int step_type = ENCODER_MANAGED_DC;  // manual override to force a specific step type for my extruder.  comment out to use same stepping as XYZ as set in parameters.h
+
+if (can_step == false) return;  //don't move if we are on hold()
+
+if ( step_type == STEP_DIR ){
+   if ( actual == false ) return ; 
+   digitalWrite(motor_speed_pin, HIGH);
+   delayMicroseconds(5);
+   digitalWrite(motor_speed_pin, LOW); 
+}
+if ( step_type == GRAY_CODE ){
+   if ( actual == false ) return ; 
+#if INVERT_E_DIR == 1
+          if ( e_direction ) { e_quadrature_state++; } else { e_quadrature_state--; }
+#else
+           if ( e_direction ) { e_quadrature_state--; } else { e_quadrature_state++; }
+#endif
+          if ( e_quadrature_state > 3 ) { e_quadrature_state = 0; }  
+          if ( e_quadrature_state < 0 ) { e_quadrature_state = 3; } 
+          int gray_code = e_quadrature_state ^ ( e_quadrature_state >> 1 ) ; //two significant bits in gray_code are the two pin states we want.
+          int E1 = gray_code & 1; //lower order bit
+          int E2 = gray_code & 2;  //higher order bit
+         // write the quadrature/grey code to the two pins commonly referrred to as STEP and DIRECTION ( despite them not actually being that in this case) 
+          digitalWrite(motor_speed_pin, E1);  //equivalent to E_STEP_PIN 
+          digitalWrite(motor_dir_pin,  E2);   //equivalent to E_DIR_PIN 
+          delayMicroseconds(5);
+}
+if ( step_type == ENCODER_MANAGED_DC ){
+//  set the number of encoder pulses it should take to move one virtual "step": 
+//if you have a low-res encoder you might just set to match the numberof edges on your encoder wheel, so one "step" = 1 RPM, 
+//or even better calculate how many encoder edges it takes to extrude a mm of material! 
+
+// this is actually a game of cat-n-mouse between the DDA which calculates the desired absolute "position" and the DC motor extruder which counts how many ticks have occured in the encoder.
+// the motor is turned on if it's encoder is behind the absolute position count, and turned off if it's caught-up or ahead of the count.
+
+// each time we are asked to 'step' we are really asked to change the encoder target! 
+ if ( actual == true ) { 
+  encoder_target += E_INTERRUPTS_PER_STEP; 
+ }
+//every time the user-requested speed changes, we reset the global counters for elapsed time, and elapsed mouse ticks.
+   float target_speed = 0; 
+   
+    if ( encoder0Pos < encoder_target ) {
+      target_speed = 100;
+   } else if ( encoder0Pos > encoder_target  ) {
+     target_speed = 0;
+   }  else { // current_speed = desired_speed
+     target_speed = 100;
+   }
+
+   // if ( target_speed != encoder_speed ) {
+        analogWrite(motor_speed_pin, target_speed);
+   // }
+
+}
+if ( step_type == UNMANAGED_DC ){
+// TODO implement properly by timing how many ms we have run for, or somehting? 
+   digitalWrite(motor_speed_pin, HIGH);
+   delayMicroseconds(5);  // in the mean time, adjust this value to something way bigger to make this work! 
+   digitalWrite(motor_speed_pin, LOW); ;
+}
+}
+
+/* 
 #if 0
 void extruder::set_speed(float sp)
 {
