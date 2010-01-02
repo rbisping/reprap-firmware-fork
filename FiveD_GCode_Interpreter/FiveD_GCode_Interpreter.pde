@@ -1,6 +1,17 @@
 // Yep, this is actually -*- c++ -*-
 
+// original attributions: 
+// Arduino328/Sanguino/Mega  G-code Interpreter  (not for Arduino168)
+// Arduino v1.0 by Mike Ellery - initial software (mellery@gmail.com)
+// v1.1 by Zach Hoeken - cleaned up and did lots of tweaks (hoeken@gmail.com)
+// v1.2 by Chris Meighan - cleanup / G2&G3 support (cmeighan@gmail.com)
+// v1.3 by Zach Hoeken - added thermocouple support and multi-sample temp readings. (hoeken@gmail.com)
+// v1.4 by Adrian Bowyer - added the Sanguino; extensive mods... (a.bowyer@bath.ac.uk)
+// v1.5 by Adrian Bowyer - implemented 4D Bressenham XYZ+ stepper control... (a.bowyer@bath.ac.uk)
+
 /*
+  Current attributions: 
+
   This is a fork of Repraps FiveD Gcode Firmware
   License: GPL
   
@@ -13,8 +24,12 @@
     - re-enabled 3D gcode support
     - added auto-shutdown on idle
     - added base heater command
-    - by David/Buzz  - added early support for additional "directional control" types - quadrature driven steppers, open loop DC control as a simulated stepper ( Z-axis only), and closed-loop DC motor control (extruder only currently) July 2009 (davidbuzz@gmail.com)
-
+    By David/Buzz 2009/2010:
+    - standardise #defs around optional "features" and define which feature set is for which motherboard type
+	- DC motor extruder
+    - 4x motion options ( step/dir, graycode, DC open loop, DC closed lop)
+	- soft-stop suspend/resume of motion systems
+    - hardware interrupt suport for optos and encoders on mega
 */
 
 
@@ -43,7 +58,7 @@ char debugstring[10];
 // ex0 won't drive its stepper.  They seem fine this way round though.  But that's got
 // to be a bug.
 
-#if EXTRUDER_COUNT == 2            
+#ifdef EXTRUDER_TYPE_1          
 static extruder ex1(EXTRUDER_1_MOTOR_DIR_PIN, EXTRUDER_1_MOTOR_SPEED_PIN , EXTRUDER_1_HEATER_PIN,
               EXTRUDER_1_FAN_PIN,  EXTRUDER_1_TEMPERATURE_PIN, EXTRUDER_1_VALVE_DIR_PIN,
               EXTRUDER_1_VALVE_ENABLE_PIN, EXTRUDER_1_STEP_ENABLE_PIN);            
@@ -56,7 +71,7 @@ static extruder ex0(EXTRUDER_0_MOTOR_DIR_PIN, EXTRUDER_0_MOTOR_SPEED_PIN , EXTRU
             
 #else
 
-#if EXTRUDER_COUNT == 2    
+#ifdef EXTRUDER_TYPE_1  
 static extruder ex1(2);            
 #endif
 
@@ -116,25 +131,28 @@ void setup()
   debugstring[0] = 0;
   
   ex[0] = &ex0;
-#if EXTRUDER_COUNT == 2  
+#ifdef EXTRUDER_TYPE_1
   ex[1] = &ex1;
 #endif  
   extruder_in_use = 0; 
   
   head = 0;
   tail = 0;
-  
+ ;
+  Serial.println("start1");
   cdda[0] = &cdda0;
   cdda[1] = &cdda1;  
   cdda[2] = &cdda2;  
   cdda[3] = &cdda3;
-
-  //init any optional elements
+ 
+  Serial.println("start2");
   init_encoders();
   init_optos();
-
-  //setExtruder();
-  
+ 
+  Serial.println("start3");
+  setExtruder();
+ 
+  Serial.println("start4");
   init_process_string();
   
   where_i_am.x = 0.0;
@@ -143,8 +161,8 @@ void setup()
   where_i_am.e = 0.0;
   where_i_am.f = SLOW_XY_FEEDRATE;
   
- // Serial.begin(19200);
-  Serial.println("start");
+ 
+  Serial.println("start5");
   
   setTimer(DEFAULT_TICK);
   enableTimerInterrupt();
