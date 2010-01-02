@@ -13,6 +13,8 @@
     - re-enabled 3D gcode support
     - added auto-shutdown on idle
     - added base heater command
+    - by David/Buzz  - added early support for additional "directional control" types - quadrature driven steppers, open loop DC control as a simulated stepper ( Z-axis only), and closed-loop DC motor control (extruder only currently) July 2009 (davidbuzz@gmail.com)
+
 */
 
 
@@ -20,7 +22,7 @@
 #include <HardwareSerial.h>
 #include "WProgram.h"
 #include "vectors.h"
-#include "parameters.h"
+#include "parameters.h" //must be before pins.h
 #include "intercom.h"
 #include "pins.h"
 #include "extruder.h"

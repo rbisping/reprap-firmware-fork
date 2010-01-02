@@ -2,12 +2,12 @@
 #define PARAMETERS_H
 
 // Here are the moterboard codes; set MOTHERBOARD to the right one
-// (Arduino: 0 - no longer in use)
+// Arduino_168 : 0 ( no longer in use)
 // Sanguino or RepRap Motherboard with direct drive extruders: 1
 // RepRap Motherboard with RS485 extruders: 2
-// Arduino Mega: 3
-// Arudino Duemilanove w/ ATMega328P: 4
-
+// Arduino_Mega: 3
+// Arudino_328: 4  ( eg: Duemilanove w/ ATMega328P ) 
+  
 #define MOTHERBOARD 4
 
 
@@ -22,21 +22,17 @@
 
 //NOW WE DEFINE WHICH "FEATURES" each motherboard type has:
 
-// utilise the extra hardware interrupts on the MEGA for Opto end-stops, and Encoder WHeel/s, and define the basic hardware profile you have
-#if MOTHERBOARD == 3
-#define MEGA 1
-#define INTERRUPT_ENDSTOPS 1
-#define INTERRUPT_ENCODERS 1
-#define EXTRUDER_TYPE_0  ENCODER_MANAGED_DC  // change to STEP_DIR for the other type of extruder
-//#define EXTRUDER_TYPE_1  STEP_DIR  // uncomment only if two extruders are in use
-// now pick one of the above for the 3 x XYZ axes based on Motherboard type
-#define STEP_TYPE GRAY_CODE  //use same stepping type on all axes, including extruder.  to override on a per-axis basis, redefine in cartesian_dda::do_x_step and friends
-
+#if MOTHERBOARD == 0
+#ifdef __AVR_ATmega328P__
+#error Oops!  'Arduino Duemilanove w/ ATMega328' is motherboard type 4, not 0. see parameters.h
+#endif
+#error Oops, 5D firmware doesn't run on the Arduino 168 any more. please use an older firmware.
 #endif
 
 // utilise the extra hardware on the SANGUINO for enabling/disabling the stepper drivers as required ( to save power, etc ) , and define extruder type/s you have 
 #if MOTHERBOARD == 1
 #define SANGUINO 1
+#define USE_EXTRUDER_CONTROLLER false
 #define USE_STEPPER_ENABLE 1
 #define EXTRUDER_TYPE_0  STEP_DIR  // change to ENCODER_MANAGED_DC for the other type of extruder
 //#define EXTRUDER_TYPE_1  STEP_DIR  // uncomment if two extruders are in use
@@ -48,6 +44,7 @@
 // utilise the extra hardware on the "RepRap Motherboard with RS485" for enabling/disabling the stepper drivers as required ( to save power, etc ) , and define extruder type/s you have 
 #if MOTHERBOARD == 2 
 #define RM485 1
+#define USE_EXTRUDER_CONTROLLER true
 #define USE_STEPPER_ENABLE 1
 #define EXTRUDER_TYPE_0  STEP_DIR  // change to ENCODER_MANAGED_DC for the other type of extruder
 //#define EXTRUDER_TYPE_1  STEP_DIR  // uncomment if two extruders are in use
@@ -55,6 +52,19 @@
 #define STEP_TYPE STEP_DIR  //use same stepping type on all axes, including extruder.  to override on a per-axis basis, redefine in cartesian_dda::do_x_step and friends
 
 #endif 
+
+
+// utilise the extra hardware interrupts on the MEGA for Opto end-stops, and Encoder WHeel/s, and define the basic hardware profile you have
+#if MOTHERBOARD == 3
+#define MEGA 1
+#define INTERRUPT_ENDSTOPS 1
+#define INTERRUPT_ENCODERS 1
+#define EXTRUDER_TYPE_0  ENCODER_MANAGED_DC  // change to STEP_DIR for the other type of extruder
+//#define EXTRUDER_TYPE_1  STEP_DIR  // uncomment only if two extruders are in use
+// now pick one of the above for the 3 x XYZ axes based on Motherboard type
+#define STEP_TYPE GRAY_CODE  //use same stepping type on all axes, including extruder.  to override on a per-axis basis, redefine in cartesian_dda::do_x_step and friends
+
+#endif
 
 // Set 1s where you have endstops; 0s where you don't
 // this COULD be part of the motherboard features defined above, if we had any concensus on opto-types used.
