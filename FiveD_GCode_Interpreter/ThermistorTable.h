@@ -7,7 +7,7 @@
 #define USE_THERMISTOR
 
 // How many temperature samples to take for an average.  each sample takes about 100 usecs.
-#define TEMPERATURE_SAMPLES 3
+#define TEMPERATURE_SAMPLES 2
 
 // How accurately do we maintain the temperature?
 #define HALF_DEAD_ZONE 5

@@ -505,7 +505,7 @@ void cartesian_dda::do_e_step(bool actual)
 {
   //the extruder code is kept in per-extruder settings, so different extruders may 
   // use different stepping/control in the future. see extruder.h::step() for similar code to the above
-        ext->step(actual);
+        ex[extruder_in_use]->step(actual);
 }
 
 void cartesian_dda::enable_steppers()

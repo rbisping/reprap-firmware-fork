@@ -2,15 +2,17 @@
 #include "parameters.h"
 #include "pins.h"
 #include "extruder.h"
-#include "vectors.h"
-#include "cartesian_dda.h"
+//#include "vectors.h"
+//#include "cartesian_dda.h"
+
+#include "hardware_interrupts.h"
 
 // only do this on the mega, which has lots of spare hardware interrupts: 
-#ifdef INTERRUPT_ENDSTOPS 
+#ifdef INTERRUPT_ENDSTOPS
 //-------------------------------------------------------------------------------------------------
 // Interrupt-based End-Stops for the major 2 directions.  elsewhere we then just check if these variables are changed magically 
-volatile int  optoAstate = 0;      //the optoA variable.
-volatile int  optoBstate = 0;      //the optoB variable.
+//volatile int  optoAstate = 0;      //the optoA variable.
+//volatile int  optoBstate = 0;      //the optoB variable.
 // we will use these interrupts and pins -  interrupt 2 (pin 21), interrupt 3 (pin 20)
 //#define OPTOA 21  //Xaxis
 //#define OPTOB 20  //Yaxis
@@ -37,7 +39,7 @@ void doOptoB(){
 #ifdef INTERRUPT_ENCODERS
 
 // Interrupt-based Encoder-wheel for an/the extruder: 
-volatile long  encoder0Pos = 0;      //the encoder position variable.
+//volatile long  encoder0Pos = 0;      //the encoder position variable.
 // we will use these interrupts and pins -  interrupt 4 (pin 19), interrupt 5 (pin 18)
 //#define ENCODER0 19
 //#define ENCODER1 18  //  if you have another encoder? ( or you want to read the full quadrature signal) you may want to use this!  

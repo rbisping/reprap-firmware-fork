@@ -217,8 +217,8 @@ BUZZS wiring:
 #define EXTRUDER_0_FAN_PIN           (byte)9
 #define EXTRUDER_0_TEMPERATURE_PIN  (byte)0    // Analogue input
 #define EXTRUDER_0_VALVE_DIR_PIN     (byte)8 //NC
-#define EXTRUDER_0_VALVE_ENABLE_PIN  (byte)-1  // Valve needs to be redesigned not to need this
-#define EXTRUDER_0_STEP_ENABLE_PIN  (signed int)33 
+#define EXTRUDER_0_VALVE_ENABLE_PIN  (byte)8 //NC  // Valve needs to be redesigned not to need this
+#define EXTRUDER_0_STEP_ENABLE_PIN  (signed int)-1  //Conflicts with the fan; set -ve if no stepper
 // altername pin names, more applicable when used with stepper driven extruder, but only for single extruder setups:
 #define E_STEP_PIN EXTRUDER_0_MOTOR_SPEED_PIN
 #define E_DIR_PIN EXTRUDER_0_MOTOR_DIR_PIN

@@ -42,6 +42,7 @@
 #include "pins.h"
 #include "extruder.h"
 #include "cartesian_dda.h"
+#include "hardware_interrupts.h"
 
 // Maintain a list of extruders...
 
@@ -150,7 +151,7 @@ void setup()
   init_optos();
  
   Serial.println("start3");
-  setExtruder();
+  //setExtruder();
  
   Serial.println("start4");
   init_process_string();
