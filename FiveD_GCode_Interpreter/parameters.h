@@ -10,7 +10,8 @@
   
 #define MOTHERBOARD 4
 
-
+//want to be able to parse 3D code without barfing? 
+#define OLD3DCODE 1
 
 // there are a number of different hardware methods for getting directional movement, here we decide which one we want to use normally: 
 #define STEP_DIR 0      // standard step & direction information, recommended

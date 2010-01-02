@@ -401,26 +401,29 @@ bool process_string(char instruction[], int size)
 				 break;
 				 */
 
-// jglauche: re-activate M101-M103 and M108 codes to support both 3d & 5d code
+// 
+// Now, with 5D and E codes, there is no longer any idea of turning the extruder on or off.
+// (But see valve on/off below.)
+// but we can optionally enable M101-M103 and M108 codes to support older 3D code
 
-
+#ifdef OLD3DCODE
 			//turn extruder on, forward
 			case 101:
 				ex[extruder_in_use]->set_direction(1);
-				//ex[extruder_in_use]->set_speed(extruder_speed);
+				ex[extruder_in_use]->set_speed(extruder_speed);
 				break;
 
 			//turn extruder on, reverse
 			case 102:
 				ex[extruder_in_use]->set_direction(0);
-				//ex[extruder_in_use]->set_speed(extruder_speed);
+				ex[extruder_in_use]->set_speed(extruder_speed);
 				break;
 
 			//turn extruder off
 			case 103:
-				//ex[extruder_in_use]->set_speed(0);
+				ex[extruder_in_use]->set_speed(0);
 				break;
-
+#endif
 			//custom code for temperature control
 			case 104:
 				if (gc.seen & GCODE_S)
@@ -444,13 +447,14 @@ bool process_string(char instruction[], int size)
 			case 107:
 				ex[extruder_in_use]->set_cooler(0);
 				break;
-
+// Extruder speed is now entirely controlled by E codes
+#ifdef OLD3DCODE
 			//set max extruder speed, 0-255 PWM
 			case 108:
 				if (gc.seen & GCODE_S)
 					extruder_speed = gc.S;
 				break;
-
+#endif
  			case 109: // Base plate heater on/off
  				if (gc.seen & GCODE_S)
  				  digitalWrite(BASE_HEATER_PIN, gc.S != 0);

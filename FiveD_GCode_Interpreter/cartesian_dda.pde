@@ -510,7 +510,7 @@ void cartesian_dda::do_e_step(bool actual)
 
 void cartesian_dda::enable_steppers()
 {
-#if MOTHERBOARD > 0
+#ifdef USE_STEPPER_ENABLE
  if(delta_steps.x)
     digitalWrite(X_ENABLE_PIN, ENABLE_ON);
   if(delta_steps.y)    
@@ -526,7 +526,7 @@ void cartesian_dda::enable_steppers()
 
 void cartesian_dda::disable_steppers()
 {
-#if MOTHERBOARD > 0
+#ifdef USE_STEPPER_ENABLE
 	//disable our steppers
 	digitalWrite(X_ENABLE_PIN, !ENABLE_ON);
 	digitalWrite(Y_ENABLE_PIN, !ENABLE_ON);
