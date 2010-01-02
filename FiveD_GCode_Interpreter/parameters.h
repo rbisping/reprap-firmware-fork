@@ -8,7 +8,7 @@
 // Arduino_Mega: 3
 // Arudino_328: 4  ( eg: Duemilanove w/ ATMega328P ) 
   
-#define MOTHERBOARD 4
+#define MOTHERBOARD 3
 
 //want to be able to parse 3D code without barfing? 
 #define OLD3DCODE 1

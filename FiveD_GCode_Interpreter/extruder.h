@@ -6,22 +6,29 @@
 #ifndef EXTRUDER_H
 #define EXTRUDER_H
 
+#define EXTRUDER_FORWARD true
+#define EXTRUDER_REVERSE false
+
+// optionally enable extruder two based on setting in parameters.h
+#ifdef EXTRUDER_TYPE_0 
 #define EXTRUDER_COUNT 1
+#endif
+#ifdef EXTRUDER_TYPE_1 
+#define EXTRUDER_COUNT 2
+#endif
 
 void manage_all_extruders();
 
 void new_extruder(byte e);
 
-/**********************************************************************************************
-
-* Sanguino/RepRap Motherboard v 1.0
-
+/*
+*********************************************************************************************
+* Sanguino/Mega/RepRap Motherboard v 1.0 ( ie directly connected extruder, no RS485 ) 
+*********************************************************************************************
 */
 
 #if USE_EXTRUDER_CONTROLLER == false
 
-#define EXTRUDER_FORWARD false
-#define EXTRUDER_REVERSE true
 
 class extruder
 {
@@ -35,6 +42,7 @@ private:
     byte heater_high;
     byte heater_current;
     int extrude_step_count;
+    bool can_step;  // bool, defualts to 1, if 0, we disallow any extruder movement.
 
 // These are used for temperature control    
     byte count ;
@@ -48,6 +56,8 @@ private:
 //    int error_delta;
     bool e_direction;
     bool valve_open;
+
+    int encoder_target; // for encoder-based DC motor control only 
 
 // The pins we control
     byte motor_dir_pin, motor_speed_pin, heater_pin, fan_pin, temp_pin, valve_dir_pin, valve_en_pin;
@@ -71,36 +81,58 @@ public:
    int get_target_temperature();
    int get_temperature();
    void manage();
+
+   void hold();
+   void resume();
+ 
 // Interrupt setup and handling functions for stepper-driven extruders
    
    //void interrupt();
-   void step();
+   void step(bool actual);
 
    void enableStep();
    void disableStep();
    
 };
 
+// enable/disable the hardware from stepping, if it supports it, otherwise 
+// use a soft-stop to prevent any stepping even if requested
 inline void extruder::enableStep()
 {
-  if(step_en_pin < 0)
-    return;
-  digitalWrite(step_en_pin, ENABLE_ON); 
+  if(step_en_pin < 0) {
+    resume();  //resume from soft-stop
+  } else {
+    digitalWrite(step_en_pin, ENABLE_ON); 
+  }
 }
 
 inline void extruder::disableStep()
 {
-  if(step_en_pin < 0)
-    return;
-  digitalWrite(step_en_pin, !ENABLE_ON);
+  if(step_en_pin < 0){
+    hold(); //soft stop
+  } else {
+    digitalWrite(step_en_pin, !ENABLE_ON); //optional hard stop
+  }
 }
 
+// pretend to disable the stepper by stopping all motion/steps
+inline void extruder::hold(){
+  //espeed is the user_requested speed from set_speed() function, we DON'T want to change that here or the user-supplied value will be lost.
+  can_step = false;
+}
+inline void extruder::resume(){
+  can_step = true;
+  //set_speed(e_speed);    //espeed is the previously user_requested speed
+}
+
+/* moved to .pde as it's non-trivial now
 inline void extruder::step()
 {
    digitalWrite(motor_speed_pin, HIGH);
    delayMicroseconds(5);
    digitalWrite(motor_speed_pin, LOW);
 }
+*/
 
 inline void extruder::temperature_error()
 {
@@ -125,7 +157,10 @@ inline void extruder::wait_for_temperature()
 inline void extruder::set_direction(bool dir)
 {
 	e_direction = dir;
-	digitalWrite(motor_dir_pin, e_direction); 
+        hold(); // pause extruder, first, so we don't blow the driver chips with back-EMF! 
+        delay( 100); // todo trinm this to be as small as possible! 
+	digitalWrite(motor_dir_pin, e_direction);
+        resume(); 
 }
 
 inline void extruder::set_cooler(byte sp)
