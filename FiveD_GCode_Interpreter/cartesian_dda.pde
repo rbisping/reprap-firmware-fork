@@ -41,7 +41,7 @@ cartesian_dda::cartesian_dda()
 	pinMode(Z_STEP_PIN, OUTPUT);
 	pinMode(Z_DIR_PIN, OUTPUT);
 
-#if MOTHERBOARD > 0
+#ifdef USE_STEPPER_ENABLE
 	pinMode(X_ENABLE_PIN, OUTPUT);
 	pinMode(Y_ENABLE_PIN, OUTPUT);
 	pinMode(Z_ENABLE_PIN, OUTPUT);
@@ -120,7 +120,8 @@ void cartesian_dda::set_target(const FloatPoint& p)
 
 	// find the dominant axis.
         // NB we ignore the f values here, as it takes no time to take a step in time :-)
-
+        //   hint: 'total_steps' variable here represents the number of interpolated points we are going to 
+        //   calculate between current and target, must be bigger than the largest number of steps in any of the axises. ( ignore F here, we tweak that below)
         total_steps = max(delta_steps.x, delta_steps.y);
         total_steps = max(total_steps, delta_steps.z);
         total_steps = max(total_steps, delta_steps.e);
@@ -135,12 +136,14 @@ void cartesian_dda::set_target(const FloatPoint& p)
         }    
 
 #ifndef ACCELERATION_ON
-        current_steps.f = round(target_position.f);
+        current_steps.f = round(target_position.f);  // set the feedrate ( aka velocity at any point in the line ) as constant, ie no acceleration.
 #endif
 
         delta_steps.f = abs(target_steps.f - current_steps.f);
         
-        // Rescale the feedrate so it doesn't take lots of steps to do
+        // Rescale the feedrate so it doesn't take lots of steps to do. Effectively,  we are applying a multiplication factor to the 'total_steps'
+        // to scale the feedrate down into it.  we just do this because  otherwise the 'total_steps' calculated from above ( if we included 'f' )
+        // would be HUGE, and  we'd have to do LOTS of interpolations for little value, and no change in anything except in F.
         
         t_scale = 1;
         if(delta_steps.f > total_steps)
@@ -168,7 +171,7 @@ void cartesian_dda::set_target(const FloatPoint& p)
 	e_direction = (target_position.e >= where_i_am.e);
 	f_direction = (target_position.f >= where_i_am.f);
 
-	dda_counter.x = -total_steps/2;
+	dda_counter.x = -total_steps/2;     // strating at a negative number 1/2 the total possible steps, means that for each dda_step...
 	dda_counter.y = dda_counter.x;
 	dda_counter.z = dda_counter.x;
         dda_counter.e = dda_counter.x;
@@ -198,16 +201,19 @@ void cartesian_dda::dda_step()
                 
 		if (x_can_step)
 		{
-			dda_counter.x += delta_steps.x;
+            // ... adding the desired number of steps to the dda_counter.x means that we cause the dda_counter.x to go above zero sooner, and more often, 
+            //  , if the delta_steps.x is a bigger number, so .....
+			dda_counter.x += delta_steps.x; 
 			
+            // ... the more often the dda_counter.x overflows into a positive value, the more often this (x) axis will do a step, and start-over.
 			if (dda_counter.x > 0)
 			{
 				do_x_step();
                                 real_move = true;
-				dda_counter.x -= total_steps;
+				dda_counter.x -= total_steps;  // start counting again for this axis. from the starting point ( very near -totalsteps/2 )
 				
 				if (x_direction)
-					current_steps.x++;
+					current_steps.x++;  // remember the ACTUAL stepper steps, so we know where we are positioned. ( not the DDA "total_steps" ) 
 				else
 					current_steps.x--;
 			}
@@ -253,7 +259,7 @@ void cartesian_dda::dda_step()
 			
 			if (dda_counter.e > 0)
 			{
-				do_e_step();
+				do_e_step(true); // causes actual step request
                                 real_move = true;
 				dda_counter.e -= total_steps;
 				
@@ -262,6 +268,7 @@ void cartesian_dda::dda_step()
 				else
 					current_steps.e--;
 			}
+            do_e_step(false); // only for monitoring if extruder is caught-up on DC encoder extruders
 		}
 		
 		if (f_can_step)
