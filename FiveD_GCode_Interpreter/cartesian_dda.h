@@ -19,13 +19,14 @@ private:
 
   FloatPoint units;            // Factors for converting either mm or inches to steps
 
+  // FloatPoint where_i_am; -- is defined as a singularity in the main application, as we only want to be in a single actual position at a time, ever. this isnt really a time-and-space-machine :-)
   FloatPoint target_position;  // Where it's going
   FloatPoint delta_position;   // The difference between the two
   float distance;              // How long the path is
   
-  LongPoint current_steps;     // Similar information as above in steps rather than units
-  LongPoint target_steps;
-  LongPoint delta_steps;
+  LongPoint current_steps;     // Similar information as above in steps rather than units -- where we are now
+  LongPoint target_steps;      // -- we we are targeting
+  LongPoint delta_steps;       // -- difference of the above two.
   LongPoint dda_counter;       // DDA error-accumulation variables
   long t_scale;                // When doing lots of t steps, scale them so the DDA doesn't spend for ever on them
   
@@ -43,7 +44,9 @@ private:
 
 // Variables for acceleration calculations
 
-  long total_steps;            // The number of steps to take along the longest movement axis
+  long total_steps;            // The number of calculations to make betwene the source and the destination.  
+                                // holds no direct relation to current_steps, target_steps, or delta_steps other than htat they provide  convenient numbers 
+                                //to determine a useful value for this, as it must be as large or larger than the maximum number of steps on the domininant axis.
   
   long timestep;               // microseconds
   bool nullmove;               // this move is zero length
@@ -57,7 +60,7 @@ private:
   void do_x_step();               
   void do_y_step();
   void do_z_step();
-  void do_e_step();
+  void do_e_step(bool actual); //extruder supports DC/encoder, with virtual/actual steps
   
   // Can this axis step?
   
@@ -122,7 +125,7 @@ inline bool cartesian_dda::active()
 {
   return live;
 }
-
+/* 
 inline void cartesian_dda::do_x_step()
 {
 	digitalWrite(X_STEP_PIN, HIGH);
@@ -144,10 +147,11 @@ inline void cartesian_dda::do_z_step()
 	digitalWrite(Z_STEP_PIN, LOW);
 }
 
-inline void cartesian_dda::do_e_step()
+inline void cartesian_dda::do_e_step(bool actual)
 {
-        ex[extruder_in_use]->step();
+        ex[extruder_in_use]->step(actual);
 }
+*/
 
 inline long cartesian_dda::calculate_feedrate_delay(const float& feedrate)
 {  
@@ -162,6 +166,18 @@ inline long cartesian_dda::calculate_feedrate_delay(const float& feedrate)
 
 inline bool cartesian_dda::read_switch(byte pin)
 {
+/* 
+#ifdef INTERRUPT_ENDSTOPS
+        #if ENDSTOPS_INVERTING == 1
+                if ( pin == X_MIN_PIN ) return !optoAstate;
+                if ( pin == Y_MIN_PIN ) return !optoBstate;
+                if ( pin == Z_MIN_PIN ) return !digitalRead(Z_MIN_PIN); //oops, z is not on an interrupt 
+        #else
+                if ( pin == X_MIN_PIN ) return optoAstate;
+                if ( pin == Y_MIN_PIN ) return optoBstate;
+                if ( pin == Z_MIN_PIN ) return digitalRead(Z_MIN_PIN);
+        #endif
+#else 
 	//dual read as crude debounce
 
 	#if ENDSTOPS_INVERTING == 1
@@ -169,6 +185,29 @@ inline bool cartesian_dda::read_switch(byte pin)
 	#else
 		return digitalRead(pin) && digitalRead(pin);
 	#endif
+#endif
+*/
 }
+
+/*NOTE: EMC type 2 stepper driver is what we will achieve here :
+  Type 2:  Quadrature (aka Gray/Grey? code)
+    State   Phase A   Phase B
+      0        1        0
+      1        1        1
+      2        0        1
+      3        0        0
+      0        1        0
+  Here's the simplest algorithm for translating binary to Gray code. This algorithm can convert an arbitrary binary number to Gray code in finite time. Wonderful! He
+  grayCode = binary ^ (binary >> 1)
+*/
+#if STEP_TYPE == GRAY_CODE
+
+int x_quadrature_state = 0; // allowable values are: 0,1,2,3
+int y_quadrature_state = 0; // allowable values are: 0,1,2,3
+int z_quadrature_state = 0;
+int e_quadrature_state = 0;
+
+// we also use x_direction and y_direction to decide the direction we roll through each quadrature
+#endif
 
 #endif

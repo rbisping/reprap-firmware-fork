@@ -190,7 +190,7 @@ BUZZS wiring:
 #define X_STEP_PIN (byte)6
 #define X_DIR_PIN (byte)7
 #define X_MIN_PIN (byte)21
-#define X_MAX_PIN (byte)   // must support interrupt if MEGA, and be setup
+#define X_MAX_PIN (byte)21   // must support interrupt if MEGA, and be setup
 #define X_MAX_PIN (byte)8 //NC
 #define X_ENABLE_PIN (byte)24
 
@@ -204,7 +204,7 @@ BUZZS wiring:
 #define Z_DIR_PIN (byte)4
 #define Z_MIN_PIN (byte)22 
 #define Z_MAX_PIN (byte)8 //NC
-#define Z_ENABLE_PIN (byte)30
+#define Z_ENABLE_PIN (byte)8 //NC
 
 #define BASE_HEATER_PIN   (byte)-1
 #define POWER_SUPPLY_PIN (byte)-1
