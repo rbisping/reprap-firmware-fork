@@ -10,9 +10,54 @@
 
 #define MOTHERBOARD 4
 
+
+
+// there are a number of different hardware methods for getting directional movement, here we decide which one we want to use normally: 
+#define STEP_DIR 0      // standard step & direction information, recommended
+#define GRAY_CODE 1     // also called quadrature stepping, less popular but basically same quality as above
+#define UNMANAGED_DC 2  //open-ended DC motor using timer.  very low res, use for Z axis only, and only if you must
+#define ENCODER_MANAGED_DC 3// closed-loop DC motor who's position is maintained by an opto or magneto encoder generating edges on an external imterrupt line. MEGA only at this time
+
+
+
+//NOW WE DEFINE WHICH "FEATURES" each motherboard type has:
+
+// utilise the extra hardware interrupts on the MEGA for Opto end-stops, and Encoder WHeel/s, and define the basic hardware profile you have
+#ifdef MOTHERBOARD == 3  //MEGA
+#define INTERRUPT_ENDSTOPS 1
+#define INTERRUPT_ENCODERS 1
+#define EXTRUDER_TYPE_0  ENCODER_MANAGED_DC  // change to STEP_DIR for the other type of extruder
+//#define EXTRUDER_TYPE_1  STEP_DIR  // uncomment only if two extruders are in use
+// now pick one of the above for the 3 x XYZ axes based on Motherboard type
+#define STEP_TYPE GRAY_CODE  //use same stepping type on all axes, including extruder.  to override on a per-axis basis, redefine in cartesian_dda::do_x_step and friends
+
+#endif
+
+// utilise the extra hardware on the SANGUINO for enabling/disabling the stepper drivers as required ( to save power, etc ) , and define extruder type/s you have 
+#ifdef MOTHERBOARD == 1 // SANGUINO
+#define USE_STEPPER_ENABLE 1
+#define EXTRUDER_TYPE_0  STEP_DIR  // change to ENCODER_MANAGED_DC for the other type of extruder
+//#define EXTRUDER_TYPE_1  STEP_DIR  // uncomment if two extruders are in use
+// now pick one of the above for the 3 x XYZ axes based on Motherboard type
+#define STEP_TYPE STEP_DIR  //use same stepping type on all axes, including extruder.  to override on a per-axis basis, redefine in cartesian_dda::do_x_step and friends
+
+#endif 
+
+// utilise the extra hardware on the SANGUINO for enabling/disabling the stepper drivers as required ( to save power, etc ) , and define extruder type/s you have 
+#ifdef MOTHERBOARD == 2 // RepRap Motherboard with RS485
+#define USE_STEPPER_ENABLE 1
+#define EXTRUDER_TYPE_0  STEP_DIR  // change to ENCODER_MANAGED_DC for the other type of extruder
+//#define EXTRUDER_TYPE_1  STEP_DIR  // uncomment if two extruders are in use
+// now pick one of the above for the 3 x XYZ axes based on Motherboard type
+#define STEP_TYPE STEP_DIR  //use same stepping type on all axes, including extruder.  to override on a per-axis basis, redefine in cartesian_dda::do_x_step and friends
+
+#endif 
+
 // Set 1s where you have endstops; 0s where you don't
+// this COULD be part of the motherboard features defined above, if we had any concensus on opto-types used.
 #define ENDSTOPS_MIN_ENABLED 1
 #define ENDSTOPS_MAX_ENABLED 0
+
 
 //our command string length
 #define COMMAND_SIZE 128
