@@ -121,6 +121,7 @@ bool get_and_do_command()
 	if (Serial.available())
 	{
 		c = Serial.read();
+                blink();
                 if(c == '\r')
                   c = '\n';
                 // Throw away control chars except \n
@@ -334,6 +335,7 @@ bool process_string(char instruction[], int size)
                 // Wait till the buffer q is empty first
                     
                   while(!qEmpty()) delay(WAITING_DELAY);
+                  //delay(2*WAITING_DELAY); // For luck
 		  switch (gc.G)
 		  {
 
@@ -381,7 +383,7 @@ bool process_string(char instruction[], int size)
 	{
             // Wait till the q is empty first
             while(!qEmpty()) delay(WAITING_DELAY);
-            
+            //delay(2*WAITING_DELAY);
 		switch (gc.M)
 		{
 			//TODO: this is a bug because search_string returns 0.  gotta fix that.
@@ -453,12 +455,24 @@ bool process_string(char instruction[], int size)
 			case 108:
 				if (gc.seen & GCODE_S)
 					extruder_speed = gc.S;
+					#if USE_EXTRUDER_CONTROLLER == true
+                        ex[extruder_in_use]->setPWM((int)(255.0*gc.S + 0.5));
+					#endif
 				break;
 #endif
- 			case 109: // Base plate heater on/off
+
+            // Set the temperature and wait for it to get there
+			case 109:
+				ex[extruder_in_use]->set_target_temperature((int)gc.S);
+                                ex[extruder_in_use]->wait_for_temperature();
+				break;
+
+ 			case 110: // Base plate heater on/off
  				if (gc.seen & GCODE_S)
  				  digitalWrite(BASE_HEATER_PIN, gc.S != 0);
  				break;
+
+
 
 // The valve (real, or virtual...) is now the way to control any extruder (such as
 // a pressurised paste extruder) that cannot move using E codes.
@@ -488,6 +502,7 @@ bool process_string(char instruction[], int size)
         if (gc.seen & GCODE_T)
         {
             while(!qEmpty()) delay(WAITING_DELAY);
+            //delay(2*WAITING_DELAY);
             new_extruder(gc.T);
             return false;
         }

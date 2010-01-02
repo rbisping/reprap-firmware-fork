@@ -30,28 +30,28 @@ private:
   LongPoint dda_counter;       // DDA error-accumulation variables
   long t_scale;                // When doing lots of t steps, scale them so the DDA doesn't spend for ever on them
   
-  byte x_direction;            // Am I going in the + or - direction?
-  byte y_direction;
-  byte z_direction;
-  byte e_direction;
-  byte f_direction;
+  volatile bool x_direction;            // Am I going in the + or - direction?
+  volatile bool y_direction;
+  volatile bool z_direction;
+  volatile bool e_direction;
+  volatile bool f_direction;
 
-  bool x_can_step;             // Am I not at an endstop?  Have I not reached the target? etc.
-  bool y_can_step;
-  bool z_can_step;
-  bool e_can_step;
-  bool f_can_step;
+  volatile bool x_can_step;             // Am I not at an endstop?  Have I not reached the target? etc.
+  volatile bool y_can_step;
+  volatile bool z_can_step;
+  volatile bool e_can_step;
+  volatile bool f_can_step;
 
 // Variables for acceleration calculations
 
-  long total_steps;            // The number of calculations to make betwene the source and the destination.  
+  volatile long total_steps;            // The number of calculations to make betwene the source and the destination.  
                                 // holds no direct relation to current_steps, target_steps, or delta_steps other than htat they provide  convenient numbers 
                                 //to determine a useful value for this, as it must be as large or larger than the maximum number of steps on the domininant axis.
   
   long timestep;               // microseconds
   bool nullmove;               // this move is zero length
-  bool real_move;              // Flag to know if we've changed something physical
-  volatile bool live;                   // Flag for when we're plotting a line
+  volatile bool real_move;     // Flag to know if we've changed something physical
+  volatile bool live;          // Flag for when we're plotting a line
 
 // Internal functions that need not concern the user
 
@@ -64,7 +64,7 @@ private:
   
   // Can this axis step?
   
-  bool can_step(byte min_pin, byte max_pin, long current, long target, byte dir);
+  bool can_step(int min_pin, int max_pin, long current, long target, bool dir);
   
   // Read a limit switch
   
@@ -125,31 +125,31 @@ inline bool cartesian_dda::active()
 {
   return live;
 }
-/* 
+/*  these next 4 methods are no-longer inlined, see cartesion_dda.pde for their implementation
 inline void cartesian_dda::do_x_step()
 {
 	digitalWrite(X_STEP_PIN, HIGH);
-	delayMicroseconds(5);
+	delayMicrosecondsInterruptible(5);
 	digitalWrite(X_STEP_PIN, LOW);
 }
 
 inline void cartesian_dda::do_y_step()
 {
 	digitalWrite(Y_STEP_PIN, HIGH);
-	delayMicroseconds(5);
+	delayMicrosecondsInterruptible(5);
 	digitalWrite(Y_STEP_PIN, LOW);
 }
 
 inline void cartesian_dda::do_z_step()
 {
 	digitalWrite(Z_STEP_PIN, HIGH);
-	delayMicroseconds(5);
+	delayMicrosecondsInterruptible(5);
 	digitalWrite(Z_STEP_PIN, LOW);
 }
 
 inline void cartesian_dda::do_e_step(bool actual)
 {
-        ex[extruder_in_use]->step(actual);
+        ex[extruder_in_use]->sStep(actual);
 }
 */
 
@@ -166,17 +166,19 @@ inline long cartesian_dda::calculate_feedrate_delay(const float& feedrate)
 
 inline bool cartesian_dda::read_switch(byte pin)
 {
-/* 
+ 
 #ifdef INTERRUPT_ENDSTOPS
-        #if ENDSTOPS_INVERTING == 1
+	#if ENDSTOPS_INVERTING == 1
+/* 
                 if ( pin == X_MIN_PIN ) return !optoAstate;
                 if ( pin == Y_MIN_PIN ) return !optoBstate;
                 if ( pin == Z_MIN_PIN ) return !digitalRead(Z_MIN_PIN); //oops, z is not on an interrupt 
-        #else
+	#else
                 if ( pin == X_MIN_PIN ) return optoAstate;
                 if ( pin == Y_MIN_PIN ) return optoBstate;
                 if ( pin == Z_MIN_PIN ) return digitalRead(Z_MIN_PIN);
-        #endif
+*/
+	#endif
 #else 
 	//dual read as crude debounce
 
@@ -186,7 +188,7 @@ inline bool cartesian_dda::read_switch(byte pin)
 		return digitalRead(pin) && digitalRead(pin);
 	#endif
 #endif
-*/
+
 }
 
 /*NOTE: EMC type 2 stepper driver is what we will achieve here :

@@ -29,9 +29,34 @@ void new_extruder(byte e);
 
 #if USE_EXTRUDER_CONTROLLER == false
 
-
 class extruder
 {
+
+public:
+
+   extruder(byte md_pin, byte ms_pin, byte h_pin, byte f_pin, byte t_pin, byte vd_pin, byte ve_pin, signed int se_pin);
+   void wait_for_temperature();
+   void valve_set(bool open, int dTime);
+
+   void set_direction(bool direction);
+   //void set_speed(float es);
+   void set_cooler(byte e_speed);
+   void set_target_temperature(int temp);
+   int get_target_temperature();
+   int get_temperature();
+   void manage();
+
+   void hold();
+   void resume();
+ 
+// Interrupt setup and handling functions for stepper-driven extruders
+   
+   //void interrupt();
+   void step(bool actual);
+
+   void enableStep();
+   void disableStep();
+
 private:
 
 //these our the default values for the extruder.
@@ -42,7 +67,7 @@ private:
     byte heater_high;
     byte heater_current;
     int extrude_step_count;
-    bool can_step;  // bool, defualts to 1, if 0, we disallow any extruder movement.
+    bool can_step;  // bool, defaults to 1, if 0, we disallow any extruder movement.
 
 // These are used for temperature control    
     byte count ;
@@ -68,30 +93,7 @@ private:
      void temperature_error(); 
      int sample_temperature();
      
-public:
 
-   extruder(byte md_pin, byte ms_pin, byte h_pin, byte f_pin, byte t_pin, byte vd_pin, byte ve_pin, signed int se_pin);
-   void wait_for_temperature();
-   void valve_set(bool open, int dTime);
-
-   void set_direction(bool direction);
-   //void set_speed(float es);
-   void set_cooler(byte e_speed);
-   void set_target_temperature(int temp);
-   int get_target_temperature();
-   int get_temperature();
-   void manage();
-
-   void hold();
-   void resume();
- 
-// Interrupt setup and handling functions for stepper-driven extruders
-   
-   //void interrupt();
-   void step(bool actual);
-
-   void enableStep();
-   void disableStep();
    
 };
 
@@ -179,90 +181,189 @@ inline void extruder::set_cooler(byte sp)
 
 #else
 
+
+#define WAIT_T 'W'        // wait_for_temperature();
+#define VALVE 'V'         // valve_set(bool open, int dTime);
+#define DIRECTION 'D'     // set_direction(bool direction);
+#define COOL 'C'          // set_cooler(byte e_speed);
+#define SET_T 'T'         // set_target_temperature(int temp);
+#define GET_T 't'         // get_temperature();
+#define STEP 'S'          // step();
+#define ENABLE 'E'        // enableStep();
+#define DISABLE 'e'       // disableStep();
+#define PREAD 'R'         // read the pot voltage
+#define SPWM 'M'          // Set the motor PWM
+#define PING 'P'          // Just acknowledge
+
 class extruder
 {
-private:
 
-  byte address;
- 
 public:
    extruder(byte a);
    void wait_for_temperature();
    void valve_set(bool open, int dTime);
    void set_direction(bool direction);
    void set_cooler(byte e_speed);
-   void set_temperature(int temp);
-   int get_temperature();
+   void set_target_temperature(int temp);
+   int get_target_temperature();
    void manage();
    void step();
 
    void enableStep();
    void disableStep();
-   
+   int potVoltage();
+   void setPWM(int p);
+   bool ping();
+
+private:
+
+   char my_name;
+   int target_celcius;
+   int count;
+   int oldT, newT;
+   char commandBuffer[RS485_BUF_LEN];
+   char* reply;
+   bool stp;
+
+   void buildCommand(char c);   
+   void buildCommand(char c, char v);
+   void buildNumberCommand(char c, int v);
+   void temperatureError();  
 };
 
-inline extruder::extruder(byte a)
+inline extruder::extruder(char name)
 {
-  address = a;
+  my_name = name;
+  pinMode(E_STEP_PIN, OUTPUT);
+  pinMode(E_DIR_PIN, OUTPUT);
+  digitalWrite(E_STEP_PIN, 0);
+  digitalWrite(E_DIR_PIN, 0);
+  setTemperature(0);
+  stp = false;
 }
 
-inline  void extruder::wait_for_temperature()
+inline void extruder::buildCommand(char c)
 {
-  
+  commandBuffer[0] = c;
+  commandBuffer[1] = 0;  
 }
+
+inline void extruder::buildCommand(char c, char v)
+{
+  commandBuffer[0] = c;
+  commandBuffer[1] = v;
+  commandBuffer[2] = 0;  
+}
+
+inline void extruder::buildNumberCommand(char c, int v)
+{
+  commandBuffer[0] = c;
+  itoa(v, &commandBuffer[1], 10);
+}
+
+
+
 
 inline  void extruder::valve_set(bool open, int dTime)
 {
    if(open)
-     talker.sendPacket(address, "V1");
+     buildCommand(VALVE, '1');
    else
-     talker.sendPacket(address, "V0");
+     buildCommand(VALVE, '0');
+   talker.sendPacketAndCheckAcknowledgement(my_name, commandBuffer);
+   
    delay(dTime);
 }
 
-inline void extruder::set_direction(bool direction)
-{
-  
-}
-
 inline  void extruder::set_cooler(byte e_speed)
-{
-  
+{   
+   buildNumberCommand(COOL, e_speed);
+   talker.sendPacketAndCheckAcknowledgement(my_name, commandBuffer);
 }
 
-inline  void extruder::set_temperature(int temp)
+inline  void extruder::set_target_temperature(int temp)
 {
-  
+   target_celcius = temp;
+   buildNumberCommand(SET_T, temp);
+   talker.sendPacketAndCheckAcknowledgement(my_name, commandBuffer); 
 }
 
-inline  int extruder::get_temperature()
+inline  int extruder::get_target_temperature()
 {
-  return 1;  
+   buildCommand(GET_T);
+   char* reply = talker.sendPacketAndGetReply(my_name, commandBuffer);
+   return(atoi(reply));
 }
 
 inline  void extruder::manage()
 {
-  
+
 }
+
+inline void extruder::set_direction(bool direction)
+{
+//   if(direction)
+//     buildCommand(DIRECTION, '1');
+//   else
+//     buildCommand(DIRECTION, '0');
+//   talker.sendPacketAndCheckAcknowledgement(my_name, commandBuffer);
+   if(direction)
+     digitalWrite(E_DIR_PIN, 1);
+   else
+     digitalWrite(E_DIR_PIN, 0);
+}
+
 
 inline  void extruder::step()
 {
-  
+   //buildCommand(STEP);
+   //talker.sendPacketAndCheckAcknowledgement(my_name, commandBuffer); 
+   stp = !stp;
+   if(stp)
+     digitalWrite(E_STEP_PIN, 1);
+   else
+     digitalWrite(E_STEP_PIN, 0);
 }
 
 inline  void extruder::enableStep()
 {
-  
+  // Not needed - stepping the motor enables it automatically
+
 }
 
 inline  void extruder::disableStep()
 {
-  
+  // N.B. Disabling the extrude stepper causes the backpressure to
+  // turn the motor the wrong way.  Usually leave it on.
+#if DISABLE_E  
+  buildCommand(DISABLE);
+  talker.sendPacketAndCheckAcknowledgement(my_name, commandBuffer);
+#endif
+}
+
+inline int extruder::potVoltage()
+{
+   buildCommand(PREAD);
+   char* reply = talker.sendPacketAndGetReply(my_name, commandBuffer);
+   return(atoi(reply));  
+}
+
+inline void extruder::setPWM(int p)
+{
+   buildNumberCommand(SPWM, p);
+   talker.sendPacketAndCheckAcknowledgement(my_name, commandBuffer);   
+}
+
+inline bool extruder::ping()
+{
+  buildCommand(PING);
+  return talker.sendPacketAndCheckAcknowledgement(my_name, commandBuffer);  
 }
 
 #endif
 
-extern extruder* ex[];
+extern extruder* ex[ ];
 extern byte extruder_in_use;
+
 
 #endif

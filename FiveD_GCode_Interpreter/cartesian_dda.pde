@@ -4,6 +4,7 @@
 #include "extruder.h"
 #include "vectors.h"
 #include "cartesian_dda.h"
+#include <stdio.h>
 
 
 // Initialise X, Y and Z.  The extruder is initialized
@@ -16,11 +17,11 @@ cartesian_dda::cartesian_dda()
         
   // Default is going forward
   
-        x_direction = 1;
-        y_direction = 1;
-        z_direction = 1;
-        e_direction = 1;
-        f_direction = 1;
+        x_direction = true;
+        y_direction = true;
+        z_direction = true;
+        e_direction = true;
+        f_direction = true;
         
   // Default to the origin and not going anywhere
   
@@ -105,10 +106,10 @@ void cartesian_dda::set_target(const FloatPoint& p)
         FloatPoint squares = delta_position*delta_position;
         distance = squares.x + squares.y + squares.z;
         // If we are 0, only thing changing is e
-        if(distance <= 0.0)
+        if(distance < SMALL_DISTANCE2)
           distance = squares.e;
         // If we are still 0, only thing changing is f
-        if(distance <= 0.0)
+        if(distance < SMALL_DISTANCE2)
           distance = squares.f;
         distance = sqrt(distance);          
                                                                                    			
@@ -136,7 +137,7 @@ void cartesian_dda::set_target(const FloatPoint& p)
         }    
 
 #ifndef ACCELERATION_ON
-        current_steps.f = round(target_position.f);  // set the feedrate ( aka velocity at any point in the line ) as constant, ie no acceleration.
+        current_steps.f = target_steps.f;
 #endif
 
         delta_steps.f = abs(target_steps.f - current_steps.f);
@@ -178,6 +179,8 @@ void cartesian_dda::set_target(const FloatPoint& p)
         dda_counter.f = dda_counter.x;
   
         where_i_am = p;
+
+        //sprintf(debugstring, "%d %d %d", (int)current_steps.e, (int)target_steps.e, (int)delta_steps.e);
         
         return;        
 }
@@ -188,7 +191,7 @@ void cartesian_dda::dda_step()
 {  
   if(!live)
    return;
-   
+
   do
   {
 		x_can_step = can_step(X_MIN_PIN, X_MAX_PIN, current_steps.x, target_steps.x, x_direction);
@@ -292,10 +295,10 @@ void cartesian_dda::dda_step()
   
                 if(real_move)
                 {
-                  if(t_scale > 1)
+                  //if(t_scale > 1)
                     timestep = t_scale*current_steps.f;
-                  else
-                    timestep = current_steps.f;
+                  //else
+                    //timestep = current_steps.f;
                   timestep = calculate_feedrate_delay((float) timestep);
                   setTimer(timestep);
                 }
@@ -323,29 +326,47 @@ void cartesian_dda::dda_start()
   
   if(nullmove)
     return;
-    
-  	//set our direction pins as well
+
+//set our direction pins as well
+   
+  byte d = 1;
+  	
 #if INVERT_X_DIR == 1
-	digitalWrite(X_DIR_PIN, !x_direction);
+	if(x_direction)
+            d = 0;
 #else
-	digitalWrite(X_DIR_PIN, x_direction);
+	if(!x_direction)
+            d = 0;	
 #endif
-
+        digitalWrite(X_DIR_PIN, d);
+        
+        d = 1;
+    
 #if INVERT_Y_DIR == 1
-	digitalWrite(Y_DIR_PIN, !y_direction);
+	if(y_direction)
+            d = 0;
 #else
-	digitalWrite(Y_DIR_PIN, y_direction);
+	if(!y_direction)
+            d = 0;	
 #endif
-
+        digitalWrite(Y_DIR_PIN, d);
+        
+        d = 1;
+    
 #if INVERT_Z_DIR == 1
-	digitalWrite(Z_DIR_PIN, !z_direction);
+	if(z_direction)
+            d = 0;
 #else
-	digitalWrite(Z_DIR_PIN, z_direction);
+	if(!z_direction)
+            d = 0;	
 #endif
-        if(e_direction)
-          ex[extruder_in_use]->set_direction(EXTRUDER_FORWARD);
-        else
-          ex[extruder_in_use]->set_direction(EXTRUDER_REVERSE);
+        digitalWrite(Z_DIR_PIN, d);
+
+
+       //if(e_direction)
+         ex[extruder_in_use]->set_direction(e_direction);
+       //else
+         //ex[extruder_in_use]->setDirection(false);
   
     //turn on steppers to start moving =)
     
@@ -358,7 +379,7 @@ void cartesian_dda::dda_start()
 }
 
 
-bool cartesian_dda::can_step(byte min_pin, byte max_pin, long current, long target, byte dir)
+bool cartesian_dda::can_step(int min_pin, int max_pin, long current, long target, bool dir)
 {
 
   //stop us if we're on target
@@ -369,20 +390,20 @@ bool cartesian_dda::can_step(byte min_pin, byte max_pin, long current, long targ
 
 #if ENDSTOPS_MIN_ENABLED == 1
 
-  //stop us if we're home and still going
+  //stop us if we're home and still going lower
   
-	if(!dir && min_pin >= 0)
+	if(min_pin >= 0 && !dir)
         {
-          if (read_switch(min_pin))
+          if (read_switch(min_pin) )
 		return false;
         }
 #endif
 
 #if ENDSTOPS_MAX_ENABLED == 1
 
-  //stop us if we're at max and still going
+  //stop us if we're at max and still going higher
   
-	if(dir && max_pin >= 0)
+	if(max_pin >= 0 && dir)
         {
  	    if (read_switch(max_pin))
  		return false;
@@ -399,7 +420,7 @@ void cartesian_dda::do_x_step()
 int step_type = STEP_TYPE;  // override here for a specific axis, if you like! 
 if (step_type == STEP_DIR){
 	digitalWrite(X_STEP_PIN, HIGH);
-	delayMicroseconds(5);
+	delayMicrosecondsInterruptible(5);
 	digitalWrite(X_STEP_PIN, LOW);
 }
 if (step_type == GRAY_CODE){
@@ -416,7 +437,7 @@ if (step_type == GRAY_CODE){
           // write the quadrature/grey code to the two pins commonly referrred to as STEP and DIRECTION ( despite them not actually being that in this case) 
           digitalWrite(X_STEP_PIN, X1);
           digitalWrite(X_DIR_PIN,  X2);
-          delayMicroseconds(5);
+          delayMicrosecondsInterruptible(5);
 }
 }
 
@@ -425,7 +446,7 @@ void cartesian_dda::do_y_step()
   int step_type = STEP_TYPE;  // override here for a specific axis, if you like! 
 if (step_type == STEP_DIR){
 	digitalWrite(Y_STEP_PIN, HIGH);
-	delayMicroseconds(5);
+	delayMicrosecondsInterruptible(5);
 	digitalWrite(Y_STEP_PIN, LOW);
 }
 if (step_type == GRAY_CODE){
@@ -442,7 +463,7 @@ if (step_type == GRAY_CODE){
          // write the quadrature/grey code to the two pins commonly referrred to as STEP and DIRECTION ( despite them not actually being that in this case) 
           digitalWrite(Y_STEP_PIN, Y1);
           digitalWrite(Y_DIR_PIN,  Y2);
-          delayMicroseconds(5);
+          delayMicrosecondsInterruptible(5);
 }
 }
 
@@ -452,7 +473,7 @@ void cartesian_dda::do_z_step()
   //int step_type = STEP_TYPE;  // override here for a specific axis, if you like! 
 if (step_type == STEP_DIR){
 	digitalWrite(Z_STEP_PIN, HIGH);
-	delayMicroseconds(5);
+	delayMicrosecondsInterruptible(5);
 	digitalWrite(Z_STEP_PIN, LOW);
 }
 if ( step_type == GRAY_CODE ){
@@ -469,11 +490,12 @@ if ( step_type == GRAY_CODE ){
          // write the quadrature/grey code to the two pins commonly referrred to as STEP and DIRECTION ( despite them not actually being that in this case) 
           digitalWrite(Z_STEP_PIN, Z1);
           digitalWrite(Z_DIR_PIN,  Z2);
-          delayMicroseconds(5);
+          delayMicrosecondsInterruptible(5);
 }
 if ( step_type == UNMANAGED_DC ){
           analogWrite(Z_STEP_PIN, 255); // this is really a PWM speed pin at MAX
-          delay(20); // how long does the motor need to run to go one virtual step?
+// TODO use delayMicrosecondsInterruptible(20000)?   
+        delay(20); // how long does the motor need to run to go one virtual step?
            analogWrite(Z_STEP_PIN, 0); // this is really a PWM speed pin at OFF
 }
 }
@@ -496,7 +518,7 @@ direction =
          // write the quadrature/grey code to the two pins commonly referrred to as STEP and DIRECTION ( despite them not actually being that in this case) 
           digitalWrite(Z_STEP_PIN, Z1);
           digitalWrite(Z_DIR_PIN,  Z2);
-          delayMicroseconds(5);
+          delayMicrosecondsInterruptible(5);
 }
 }
 */
@@ -528,9 +550,15 @@ void cartesian_dda::disable_steppers()
 {
 #ifdef USE_STEPPER_ENABLE
 	//disable our steppers
+#if DISABLE_X
 	digitalWrite(X_ENABLE_PIN, !ENABLE_ON);
+#endif
+#if DISABLE_Y
 	digitalWrite(Y_ENABLE_PIN, !ENABLE_ON);
-	digitalWrite(Z_ENABLE_PIN, !ENABLE_ON);
+#endif
+#if DISABLE_Z
+        digitalWrite(Z_ENABLE_PIN, !ENABLE_ON);
+#endif
 
         // Disabling the extrude stepper causes the backpressure to
         // turn the motor the wrong way.  Leave it on.
@@ -539,52 +567,4 @@ void cartesian_dda::disable_steppers()
 #endif
 }
 
-/*
 
-void cartesian_dda::delayMicrosecondsInterruptible(unsigned int us)
-{
-
-#if F_CPU >= 16000000L
-    // for the 16 MHz clock on most Arduino boards
-
-	// for a one-microsecond delay, simply return.  the overhead
-	// of the function call yields a delay of approximately 1 1/8 us.
-	if (--us == 0)
-		return;
-
-	// the following loop takes a quarter of a microsecond (4 cycles)
-	// per iteration, so execute it four times for each microsecond of
-	// delay requested.
-	us <<= 2;
-
-	// account for the time taken in the preceeding commands.
-	us -= 2;
-#else
-    // for the 8 MHz internal clock on the ATmega168
-
-    // for a one- or two-microsecond delay, simply return.  the overhead of
-    // the function calls takes more than two microseconds.  can't just
-    // subtract two, since us is unsigned; we'd overflow.
-	if (--us == 0)
-		return;
-	if (--us == 0)
-		return;
-
-	// the following loop takes half of a microsecond (4 cycles)
-	// per iteration, so execute it twice for each microsecond of
-	// delay requested.
-	us <<= 1;
-    
-    // partially compensate for the time taken by the preceeding commands.
-    // we can't subtract any more than this or we'd overflow w/ small delays.
-    us--;
-#endif
-
-
-	// busy wait
-	__asm__ __volatile__ (
-		"1: sbiw %0,1" "\n\t" // 2 cycles
-		"brne 1b" : "=w" (us) : "0" (us) // 2 cycles
-	);
-}
-*/

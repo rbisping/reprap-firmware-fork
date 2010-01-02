@@ -2,6 +2,7 @@
 #include "parameters.h"
 #include "pins.h"
 #include "ThermistorTable.h"
+#include "intercom.h"
 #include "extruder.h" 
 
 // Keep all extruders up to temperature etc.
@@ -20,87 +21,148 @@ void new_extruder(byte e)
     e = 0;
   if(e >= EXTRUDER_COUNT)
     e = EXTRUDER_COUNT - 1;
-  
+
   if(e != extruder_in_use)
   {  
     extruder_in_use = e;
     //setExtruder();
   }
 }
+//*************************************************************************
 
-/***************************************************************************************************************************
+// Extruder functions that are the same for all extruders.
 
-If we have a new motherboard (V 1.x, x >= 1), the extruder is entirely controlled via the RS485, and all  the functions to do
-it are simple inlines in extruder.h
+/* inlined version of this function is preferred * / 
+void extruder::wait_for_temperature()
+{
+  byte seconds = 0;
+  bool warming = true;
+  count = 0;
+  newT = 0;
+  oldT = newT;
 
-Otherwise, we have to do the work ourselves...
+  while (true)
+  {
+    manageAllExtruders();
+    newT += getTemperature();
+    count++;
+    if(count > 5)
+    {
+      newT = newT/5;
+      if(newT >= target_celcius - HALF_DEAD_ZONE)
+      {
+        warming = false;
+        if(seconds > WAIT_AT_TEMPERATURE)
+          return;
+        else 
+          seconds++;
+      } 
+
+      if(warming)
+      {
+        if(newT > oldT)
+          oldT = newT;
+        else
+        {
+          // Temp isn't increasing - extruder hardware error
+          temperatureError();
+          return;
+        }
+      }
+
+      newT = 0;
+      count = 0;
+    }
+    delay(1000);
+  }
+}
+#endif
+
+// TODO: Should use debugstring[]
+/* inline version preferred
+void extruder::temperature_error()
+{
+  Serial.print("E: ");
+  Serial.println(getTemperature());  
+}
 */
 
+/***************************************************************************************************************************
+ *
+ * If we have a new motherboard (V 1.x, x >= 1), the extruder is entirely controlled via the RS485, and all  the functions to do
+ * it are simple inlines in extruder.h
+ * 
+ * Otherwise, we have to do the work ourselves...
+ */
+
 #if USE_EXTRUDER_CONTROLLER == false
+
 extruder::extruder(byte md_pin, byte ms_pin, byte h_pin, byte f_pin, byte t_pin, byte vd_pin, byte ve_pin, signed int se_pin)
 {
-         motor_dir_pin = md_pin;
-         motor_speed_pin = ms_pin;
-         heater_pin = h_pin;
-         fan_pin = f_pin;
-         temp_pin = t_pin;
-         valve_dir_pin = vd_pin;
-         valve_en_pin = ve_pin;
-         step_en_pin = se_pin;
-         
-	//setup our pins
-	pinMode(motor_dir_pin, OUTPUT);
-	pinMode(motor_speed_pin, OUTPUT);
-	pinMode(heater_pin, OUTPUT);
+  motor_dir_pin = md_pin;
+  motor_speed_pin = ms_pin;
+  heater_pin = h_pin;
+  fan_pin = f_pin;
+  temp_pin = t_pin;
+  valve_dir_pin = vd_pin;
+  valve_en_pin = ve_pin;
+  step_en_pin = se_pin;
 
-	pinMode(temp_pin, INPUT);
-	pinMode(valve_dir_pin, OUTPUT); 
-        pinMode(valve_en_pin, OUTPUT);
+  //setup our pins
+  pinMode(motor_dir_pin, OUTPUT);
+  pinMode(motor_speed_pin, OUTPUT);
+  pinMode(heater_pin, OUTPUT);
 
-	//initialize values
-	digitalWrite(motor_dir_pin, EXTRUDER_FORWARD);
-	
-	analogWrite(heater_pin, 0);
-	analogWrite(motor_speed_pin, 0);
-	digitalWrite(valve_dir_pin, false);
-	digitalWrite(valve_en_pin, 0);
+  pinMode(temp_pin, INPUT);
+  pinMode(valve_dir_pin, OUTPUT); 
+  pinMode(valve_en_pin, OUTPUT);
 
-// The step enable pin and the fan pin are the same...
-// We can have one, or the other, but not both
+  //initialize values
+  digitalWrite(motor_dir_pin, EXTRUDER_FORWARD);
 
-        if(step_en_pin >= 0)
-        {
-          pinMode(step_en_pin, OUTPUT);
-	  disableStep();
-        } else
-        {
-	  pinMode(fan_pin, OUTPUT);
-          analogWrite(fan_pin, 0);
-        }
+  analogWrite(heater_pin, 0);
+  analogWrite(motor_speed_pin, 0);
+  digitalWrite(valve_dir_pin, false);
+  digitalWrite(valve_en_pin, 0);
 
-        //these our the default values for the extruder.
-        e_speed = 0;
-        //target_celsius = 17;
-        target_celsius = 240;  //default to HOT!
-        max_celsius = 0;
-        heater_low = 64;
-        heater_high = 255;
-        heater_current = 0;
-        valve_open = false;
-        can_step = true; 
+  // The step enable pin and the fan pin are the same...
+  // We can have one, or the other, but not both
+
+
+  if(step_en_pin >= 0)
+  {
+    pinMode(step_en_pin, OUTPUT);
+    disableStep();
+  } 
+  else
+  {
+    pinMode(fan_pin, OUTPUT);
+    analogWrite(fan_pin, 0);
+  }
+
+  //these our the default values for the extruder.
+  e_speed = 0;
+  //target_celsius = 17;
+  target_celsius = 240;  //default to HOT!
+  max_celsius = 0;
+  heater_low = 64;
+  heater_high = 255;
+  heater_current = 0;
+  valve_open = false;
+  can_step = true; 
         
-//this is for doing encoder based extruder control
-//        rpm = 0;
-//        e_delay = 0;
-//        error = 0;
-//        last_extruder_error = 0;
-//        error_delta = 0;
-        e_direction = EXTRUDER_FORWARD;
+  //this is for doing encoder based extruder control
+  //        rpm = 0;
+  //        e_delay = 0;
+  //        error = 0;
+  //        last_extruder_error = 0;
+  //        error_delta = 0;
+  e_direction = EXTRUDER_FORWARD;
         
-        encoder_target = 0; // for DVC driven extruder/s        
+  encoder_target = 0; // for DC driven extruder/s        
         
-        //set default temp
-        set_target_temperature(target_celsius);
+  //set default temp
+  set_target_temperature(target_celsius);
 }
 
 
@@ -154,23 +216,23 @@ byte extruder::wait_till_cool()
 
 void extruder::valve_set(bool open, int dTime)
 {
-        wait_for_temperature();
-	valve_open = open;
-	digitalWrite(valve_dir_pin, open);
-        digitalWrite(valve_en_pin, 1);
-        delay(dTime);
-        digitalWrite(valve_en_pin, 0);
+  wait_for_temperature();
+  valve_open = open;
+  digitalWrite(valve_dir_pin, open);
+  digitalWrite(valve_en_pin, 1);
+  delay(dTime);
+  digitalWrite(valve_en_pin, 0);
 }
 
 
 void extruder::set_target_temperature(int temp)
 {
-	target_celsius = temp;
-	max_celsius = (temp*11)/10;
+  target_celsius = temp;
+  max_celsius = (temp*11)/10;
 
-        // If we've turned the heat off, we might as well disable the extrude stepper
-       // if(target_celsius < 1)
-        //  disableStep(); 
+    // If we've turned the heat off, we might as well disable the extrude stepper
+  // if(target_celsius < 1)
+  //  disableStep(); 
 }
 
 int extruder::get_target_temperature()

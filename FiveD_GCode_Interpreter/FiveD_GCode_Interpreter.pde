@@ -26,23 +26,25 @@
     - added base heater command
     By David/Buzz 2009/2010:
     - standardise #defs around optional "features" and define which feature set is for which motherboard type
-	- DC motor extruder
-    - 4x motion options ( step/dir, graycode, DC open loop, DC closed lop)
-	- soft-stop suspend/resume of motion systems
-    - hardware interrupt suport for optos and encoders on mega
+      - DC motor extruder
+      - 4x motion options ( step/dir, graycode, DC open loop, DC closed lop)
+      - soft-stop suspend/resume of motion systems
+      - hardware interrupt suport for optos and encoders on mega
+      - made RS485 the trigger to initialise ans use the RS485 bus and comms system
 */
 
 
 #include <ctype.h>
 #include <HardwareSerial.h>
+#include <avr/pgmspace.h>
 #include "WProgram.h"
 #include "vectors.h"
 #include "parameters.h" //must be before pins.h
 #include "intercom.h"
 #include "pins.h"
+#include "hardware_interrupts.h"
 #include "extruder.h"
 #include "cartesian_dda.h"
-#include "hardware_interrupts.h"
 
 // Maintain a list of extruders...
 
@@ -51,7 +53,7 @@ byte extruder_in_use = 0;
 
 // Text placed in this (terminated with 0) will be transmitted back to the host
 // along with the next G Code acknowledgement.
-char debugstring[10];
+char debugstring[100];
 
 #if USE_EXTRUDER_CONTROLLER == false
 
@@ -73,10 +75,10 @@ static extruder ex0(EXTRUDER_0_MOTOR_DIR_PIN, EXTRUDER_0_MOTOR_SPEED_PIN , EXTRU
 #else
 
 #ifdef EXTRUDER_TYPE_1  
-static extruder ex1(2);            
+static extruder ex1(E1_NAME);            
 #endif
 
-static extruder ex0(1);
+static extruder ex0(E0_NAME);
 
 intercom talker;
 
@@ -93,6 +95,9 @@ static cartesian_dda cdda3;
 
 volatile byte head;
 volatile byte tail;
+bool led;
+
+unsigned char interruptBlink;
 
 // Where the machine is from the point of view of the command stream
 
@@ -113,11 +118,19 @@ ISR(TIMER1_COMPA_vect)
 {
   disableTimerInterrupt();
   
+  interruptBlink++;
+  if(interruptBlink == 0x80)
+  {
+     blink();
+     interruptBlink = 0; 
+  }
+
+      
   if(cdda[tail]->active())
-    cdda[tail]->dda_step();
+      cdda[tail]->dda_step();
   else
-    dQMove();
-    
+      dQMove();
+ 
   enableTimerInterrupt();
 }
 
@@ -129,7 +142,10 @@ void setup()
   
   disableTimerInterrupt();
   setupTimerInterrupt();
+  interruptBlink = 0;
+  pinMode(DEBUG_PIN, OUTPUT);
   debugstring[0] = 0;
+  led = false;
   
   ex[0] = &ex0;
 #ifdef EXTRUDER_TYPE_1
@@ -156,18 +172,27 @@ void setup()
   Serial.println("start4");
   init_process_string();
   
-  where_i_am.x = 0.0;
+/*  where_i_am.x = 0.0;
   where_i_am.y = 0.0;
   where_i_am.z = 0.0;
   where_i_am.e = 0.0;
   where_i_am.f = SLOW_XY_FEEDRATE;
-  
- 
+*/
+
   Serial.println("start5");
   
+#if POWER_SUPPLY_PIN != -1
+    pinMode(POWER_SUPPLY_PIN, OUTPUT);  // add to run G3 as built by makerbot
+    digitalWrite(POWER_SUPPLY_PIN, LOW);   // ditto
+    delay(2000);    
+#endif
+// initialise the RS485 bus and stuff here.! 
+#if USE_EXTRUDER_CONTROLLER == true
+    rs485Interface.begin(RS485_BAUD);  
+#endif
+
   setTimer(DEFAULT_TICK);
   enableTimerInterrupt();
-
 }
 
 bool idling = true;
@@ -202,6 +227,9 @@ void loop()
                         }
                 }
         }
+#if USE_EXTRUDER_CONTROLLER == true
+   talker.tick();
+#endif
 }
 
 //******************************************************************************************
@@ -255,6 +283,15 @@ inline void setPosition(const FloatPoint& p)
 {
   where_i_am = p;  
 }
+
+void blink()
+{
+  led = !led;
+  if(led)
+      digitalWrite(DEBUG_PIN, 1);
+  else
+      digitalWrite(DEBUG_PIN, 0);
+} 
 
 
 //******************************************************************************************
@@ -410,5 +447,29 @@ inline void setTimer(long delay)
         
 	setTimerCeiling(getTimerCeiling(delay));
 	setTimerResolution(getTimerResolution(delay));
+}
+
+
+void delayMicrosecondsInterruptible(unsigned int us)
+{
+  // for a one-microsecond delay, simply return.  the overhead
+  // of the function call yields a delay of approximately 1 1/8 us.
+  if (--us == 0)
+    return;
+
+  // the following loop takes a quarter of a microsecond (4 cycles)
+  // per iteration, so execute it four times for each microsecond of
+  // delay requested.
+  us <<= 2;
+
+  // account for the time taken in the preceeding commands.
+  us -= 2;
+
+  // busy wait
+  __asm__ __volatile__ ("1: sbiw %0,1" "\n\t" // 2 cycles
+"brne 1b" : 
+  "=w" (us) : 
+  "0" (us) // 2 cycles
+    );
 }
 
