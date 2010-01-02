@@ -394,8 +394,119 @@ bool cartesian_dda::can_step(byte min_pin, byte max_pin, long current, long targ
 	return true;
 }
 
+void cartesian_dda::do_x_step()
+{
+int step_type = STEP_TYPE;  // override here for a specific axis, if you like! 
+if (step_type == STEP_DIR){
+	digitalWrite(X_STEP_PIN, HIGH);
+	delayMicroseconds(5);
+	digitalWrite(X_STEP_PIN, LOW);
+}
+if (step_type == GRAY_CODE){
+#if INVERT_X_DIR == 1
+          if ( x_direction ) { x_quadrature_state--; } else { x_quadrature_state++; }
+#else 
+          if ( x_direction ) { x_quadrature_state++; } else { x_quadrature_state--; }
+#endif
+          if ( x_quadrature_state > 3 ) { x_quadrature_state = 0; }
+          if ( x_quadrature_state < 0 ) { x_quadrature_state = 3; } 
+          int gray_code = x_quadrature_state ^ ( x_quadrature_state >> 1 ) ; //two significant bits in gray_code are the two pin states we want.
+          int X1 = gray_code & 1; //lower order bit
+          int X2 = gray_code & 2;  //higher order bit
+          // write the quadrature/grey code to the two pins commonly referrred to as STEP and DIRECTION ( despite them not actually being that in this case) 
+          digitalWrite(X_STEP_PIN, X1);
+          digitalWrite(X_DIR_PIN,  X2);
+          delayMicroseconds(5);
+}
+}
 
+void cartesian_dda::do_y_step()
+{
+  int step_type = STEP_TYPE;  // override here for a specific axis, if you like! 
+if (step_type == STEP_DIR){
+	digitalWrite(Y_STEP_PIN, HIGH);
+	delayMicroseconds(5);
+	digitalWrite(Y_STEP_PIN, LOW);
+}
+if (step_type == GRAY_CODE){
+#if INVERT_Y_DIR == 1
+          if ( y_direction ) { y_quadrature_state++; } else { y_quadrature_state--; }
+#else
+           if ( y_direction ) { y_quadrature_state--; } else { y_quadrature_state++; }
+#endif
+          if ( y_quadrature_state > 3 ) { y_quadrature_state = 0; }  
+          if ( y_quadrature_state < 0 ) { y_quadrature_state = 3; } 
+          int gray_code = y_quadrature_state ^ ( y_quadrature_state >> 1 ) ; //two significant bits in gray_code are the two pin states we want.
+          int Y1 = gray_code & 1; //lower order bit
+          int Y2 = gray_code & 2;  //higher order bit
+         // write the quadrature/grey code to the two pins commonly referrred to as STEP and DIRECTION ( despite them not actually being that in this case) 
+          digitalWrite(Y_STEP_PIN, Y1);
+          digitalWrite(Y_DIR_PIN,  Y2);
+          delayMicroseconds(5);
+}
+}
 
+void cartesian_dda::do_z_step()
+{
+  int step_type = UNMANAGED_DC; // manual override for a specific axis, in this case, my Z is DC driven, comment out to use global setting in parameters.h
+  //int step_type = STEP_TYPE;  // override here for a specific axis, if you like! 
+if (step_type == STEP_DIR){
+	digitalWrite(Z_STEP_PIN, HIGH);
+	delayMicroseconds(5);
+	digitalWrite(Z_STEP_PIN, LOW);
+}
+if ( step_type == GRAY_CODE ){
+#if INVERT_Z_DIR == 1
+          if ( z_direction ) { z_quadrature_state++; } else { z_quadrature_state--; }
+#else
+           if ( z_direction ) { z_quadrature_state--; } else { z_quadrature_state++; }
+#endif
+          if ( z_quadrature_state > 3 ) { z_quadrature_state = 0; }  
+          if ( z_quadrature_state < 0 ) { z_quadrature_state = 3; } 
+          int gray_code = z_quadrature_state ^ ( z_quadrature_state >> 1 ) ; //two significant bits in gray_code are the two pin states we want.
+          int Z1 = gray_code & 1; //lower order bit
+          int Z2 = gray_code & 2;  //higher order bit
+         // write the quadrature/grey code to the two pins commonly referrred to as STEP and DIRECTION ( despite them not actually being that in this case) 
+          digitalWrite(Z_STEP_PIN, Z1);
+          digitalWrite(Z_DIR_PIN,  Z2);
+          delayMicroseconds(5);
+}
+if ( step_type == UNMANAGED_DC ){
+          analogWrite(Z_STEP_PIN, 255); // this is really a PWM speed pin at MAX
+          delay(20); // how long does the motor need to run to go one virtual step?
+           analogWrite(Z_STEP_PIN, 0); // this is really a PWM speed pin at OFF
+}
+}
+
+/*  TODO finish writing this as a greneric gray_code logic loop to replace the above 3x indentical implementations 
+void gray_step(step_axis)  {
+ gray_code.x
+
+direction = 
+#if INVERT_Z_DIR == 1
+          if ( z_direction ) { z_quadrature_state++; } else { z_quadrature_state--; }
+#else
+           if ( z_direction ) { z_quadrature_state--; } else { z_quadrature_state++; }
+#endif
+          if ( z_quadrature_state > 3 ) { z_quadrature_state = 0; }  
+          if ( z_quadrature_state < 0 ) { z_quadrature_state = 3; } 
+          int gray_code = z_quadrature_state ^ ( z_quadrature_state >> 1 ) ; //two significant bits in gray_code are the two pin states we want.
+          int Z1 = gray_code & 1; //lower order bit
+          int Z2 = gray_code & 2;  //higher order bit
+         // write the quadrature/grey code to the two pins commonly referrred to as STEP and DIRECTION ( despite them not actually being that in this case) 
+          digitalWrite(Z_STEP_PIN, Z1);
+          digitalWrite(Z_DIR_PIN,  Z2);
+          delayMicroseconds(5);
+}
+}
+*/
+
+void cartesian_dda::do_e_step(bool actual)
+{
+  //the extruder code is kept in per-extruder settings, so different extruders may 
+  // use different stepping/control in the future. see extruder.h::step() for similar code to the above
+        ext->step(actual);
+}
 
 void cartesian_dda::enable_steppers()
 {
